@@ -1,5 +1,5 @@
 import { toOffer } from "../mappers/offer.mapper.ts";
-import type { Offer } from "../models/offer.ts";
+import type { Offer, PeriodCode } from "../models/offer.ts";
 import type { User } from "../models/user.ts";
 import type { OfferFilter, OffersRepository } from "../repositories/offers.repository.ts";
 import { HttpError } from "../utils/httpError.ts";
@@ -17,7 +17,12 @@ const visibilityFilter = (viewer: User): OfferFilter => {
 };
 
 export const createOffersService = (repository: OffersRepository) => ({
-  listOffers: (viewer: User): Offer[] => repository.findAll(visibilityFilter(viewer)).map(toOffer),
+  /**
+   * Offres visibles par le profil, éventuellement restreintes à une période. Le filtre de
+   * période s'ajoute à la visibilité : il ne peut jamais révéler une offre interdite au profil.
+   */
+  listOffers: (viewer: User, period?: PeriodCode): Offer[] =>
+    repository.findAll({ ...visibilityFilter(viewer), period }).map(toOffer),
 });
 
 export type OffersService = ReturnType<typeof createOffersService>;
