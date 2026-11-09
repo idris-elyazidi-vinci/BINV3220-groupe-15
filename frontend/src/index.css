@@ -261,3 +261,33 @@ body {
   color: #1e40af;
   background-color: #dbeafe;
 }
+
+/* Candidatures */
+
+.apply-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 22rem;
+}
+
+.apply-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+.apply-form textarea {
+  min-height: 3.5rem;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-weight: 400;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  resize: vertical;
+}
+
+.muted {
+  color: #6b7280;
+}

@@ -1,0 +1,53 @@
+### Connexion de démo : étudiant (Lucas Dupont, a une candidature en cours)
+# @name lucas
+POST http://localhost:3000/auth/demo-login
+Content-Type: application/json
+
+{ "kind": "STUDENT", "id": 1 }
+
+### Connexion de démo : étudiant sans candidature (Louis Claes)
+# @name louis
+POST http://localhost:3000/auth/demo-login
+Content-Type: application/json
+
+{ "kind": "STUDENT", "id": 9 }
+
+### Connexion de démo : administrateur (n'a pas accès aux candidatures)
+# @name admin
+POST http://localhost:3000/auth/demo-login
+Content-Type: application/json
+
+{ "kind": "ADMIN", "id": 1 }
+
+### Mes candidatures (EF-33)
+GET http://localhost:3000/applications
+Authorization: {{lucas.response.body.token}}
+
+### Candidater à une offre publiée, avec message (EF-32)
+POST http://localhost:3000/applications
+Authorization: {{louis.response.body.token}}
+Content-Type: application/json
+
+{ "offerId": 1, "message": "Ce projet m'intéresse beaucoup." }
+
+### Erreur 409 : offre non publiée (RG-03)
+POST http://localhost:3000/applications
+Authorization: {{louis.response.body.token}}
+Content-Type: application/json
+
+{ "offerId": 2 }
+
+### Erreur 409 : candidature déjà en cours sur cette offre
+POST http://localhost:3000/applications
+Authorization: {{lucas.response.body.token}}
+Content-Type: application/json
+
+{ "offerId": 1 }
+
+### Erreur 403 : un administrateur ne candidate pas
+GET http://localhost:3000/applications
+Authorization: {{admin.response.body.token}}
+
+### Retirer ma candidature en cours (EF-32)
+POST http://localhost:3000/applications/1/withdrawal
+Authorization: {{lucas.response.body.token}}

@@ -171,3 +171,50 @@ récente à la plus ancienne, puis de la plus récente à la plus ancienne.
 - `400` `INVALID_QUERY` : `period` a une valeur autre que `P1`, `P2` ou `OTHER`.
 - `401` `UNAUTHENTICATED` : session absente ou invalide.
 - `403` `FORBIDDEN` : contact seulement promoteur ou signataire.
+
+## Candidatures
+
+Routes réservées aux étudiants (EF-32, EF-33). Un autre profil reçoit `403 FORBIDDEN`.
+
+### GET /applications
+
+Liste les candidatures de l'étudiant connecté, de la plus récente à la plus ancienne.
+
+- `200` : tableau de candidatures
+
+```json
+[
+  {
+    "id": 1,
+    "offerId": 1,
+    "offerTitle": "Application React de gestion de flotte",
+    "companyShortName": "Lumen Digital",
+    "message": null,
+    "status": "IN_PROGRESS",
+    "appliedAt": "2026-10-02 18:10:00"
+  }
+]
+```
+
+`status` vaut `IN_PROGRESS` (en cours), `SELECTED` (retenue), `REJECTED` (non retenue) ou
+`WITHDRAWN` (retirée).
+
+### POST /applications
+
+Candidater à une offre **publiée** (RG-03). Le message est facultatif. Une seule candidature
+« en cours » par offre : après un retrait ou un refus, candidater à nouveau est permis.
+
+- Corps : `{ "offerId": 1, "message": "facultatif" }`
+- `201` : la candidature créée (statut `IN_PROGRESS`)
+- `400` `INVALID_BODY` : `offerId` manquant/invalide ou `message` non textuel/trop long.
+- `404` `OFFER_NOT_FOUND` : l'offre n'existe pas.
+- `409` `OFFER_NOT_PUBLISHED` : l'offre n'est pas au statut « Publiée ».
+- `409` `ALREADY_APPLIED` : une candidature « en cours » existe déjà sur cette offre.
+
+### POST /applications/:id/withdrawal
+
+Retirer une candidature **en cours** appartenant à l'étudiant (EF-32).
+
+- `200` : la candidature mise à jour (statut `WITHDRAWN`)
+- `404` `APPLICATION_NOT_FOUND` : candidature inexistante ou appartenant à un autre étudiant.
+- `409` `APPLICATION_TREATED` : la candidature a déjà été traitée (retenue ou non retenue).

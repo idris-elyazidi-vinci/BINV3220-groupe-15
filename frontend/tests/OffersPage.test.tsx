@@ -38,7 +38,10 @@ describe("OffersPage", () => {
   });
 
   it("adapte la description au profil", async () => {
-    stubFetch({ "/api/offers": () => Response.json([]) });
+    stubFetch({
+      "/api/applications": () => Response.json([]),
+      "/api/offers": () => Response.json([]),
+    });
 
     const { unmount } = render(
       <OffersPage user={studentUser} token="jeton" onUnauthorized={vi.fn()} />,
@@ -88,5 +91,72 @@ describe("OffersPage", () => {
     await waitFor(() =>
       expect(fetchMock).toHaveBeenLastCalledWith("/api/offers?period=P1", expect.anything()),
     );
+  });
+});
+
+const publishedOffer = {
+  id: 1,
+  title: "Application React de gestion de flotte",
+  companyShortName: "Lumen Digital",
+  academicYear: "2026-2027",
+  period: "P2",
+  status: "PUBLISHED",
+};
+
+describe("OffersPage — candidater (EF-32)", () => {
+  it("permet à un étudiant de candidater à une offre publiée, avec message", async () => {
+    const fetchMock = stubFetch({
+      "/api/applications": () => Response.json([]),
+      "/api/offers": () => Response.json([publishedOffer]),
+    });
+
+    render(<OffersPage user={studentUser} token="jeton" onUnauthorized={vi.fn()} />);
+    await screen.findByText("Application React de gestion de flotte");
+
+    fireEvent.click(screen.getByRole("button", { name: "Candidater" }));
+    fireEvent.change(screen.getByLabelText("Message (facultatif)"), {
+      target: { value: "Ce projet m'intéresse" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Envoyer ma candidature" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/applications",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+  });
+
+  it("indique « Déjà candidaté » quand une candidature est en cours", async () => {
+    stubFetch({
+      "/api/applications": () =>
+        Response.json([
+          {
+            id: 1,
+            offerId: 1,
+            offerTitle: "Application React de gestion de flotte",
+            companyShortName: "Lumen Digital",
+            message: null,
+            status: "IN_PROGRESS",
+            appliedAt: "2026-10-02 18:10:00",
+          },
+        ]),
+      "/api/offers": () => Response.json([publishedOffer]),
+    });
+
+    render(<OffersPage user={studentUser} token="jeton" onUnauthorized={vi.fn()} />);
+    await screen.findByText("Application React de gestion de flotte");
+
+    expect(screen.getByText("Déjà candidaté")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Candidater" })).not.toBeInTheDocument();
+  });
+
+  it("ne propose pas de candidater à un administrateur", async () => {
+    stubFetch({ "/api/offers": () => Response.json([publishedOffer]) });
+
+    render(<OffersPage user={adminUser} token="jeton" onUnauthorized={vi.fn()} />);
+    await screen.findByText("Application React de gestion de flotte");
+
+    expect(screen.queryByRole("button", { name: "Candidater" })).not.toBeInTheDocument();
   });
 });
