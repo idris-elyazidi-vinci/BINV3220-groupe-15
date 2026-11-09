@@ -1,12 +1,15 @@
+import type { ReactNode } from "react";
 import type { Offer } from "../models/offer.ts";
 import { OFFER_STATUS_LABELS, OFFER_STATUS_TONES, PERIOD_LABELS } from "../utils/labels.ts";
 import StatusBadge from "./StatusBadge.tsx";
 
 interface OfferTableProps {
   offers: Offer[];
+  /** Contenu d'une colonne « Action » par offre (ex. candidater). Absente si non fourni. */
+  renderAction?: (offer: Offer) => ReactNode;
 }
 
-const OfferTable = ({ offers }: OfferTableProps) => (
+const OfferTable = ({ offers, renderAction }: OfferTableProps) => (
   <div className="table-wrapper">
     <table className="data-table">
       <thead>
@@ -16,6 +19,7 @@ const OfferTable = ({ offers }: OfferTableProps) => (
           <th scope="col">Année</th>
           <th scope="col">Période</th>
           <th scope="col">Statut</th>
+          {renderAction && <th scope="col">Action</th>}
         </tr>
       </thead>
       <tbody>
@@ -31,6 +35,7 @@ const OfferTable = ({ offers }: OfferTableProps) => (
                 tone={OFFER_STATUS_TONES[offer.status]}
               />
             </td>
+            {renderAction && <td>{renderAction(offer)}</td>}
           </tr>
         ))}
       </tbody>
