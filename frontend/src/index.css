@@ -80,9 +80,10 @@ body {
   background-color: rgb(255 255 255 / 15%);
 }
 
-/* Recherche */
+/* Recherche et filtres */
 
-.search-field {
+.search-field,
+.filter-field {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -91,7 +92,8 @@ body {
   font-weight: 600;
 }
 
-.search-field input {
+.search-field input,
+.filter-field select {
   padding: 0.5rem 0.75rem;
   font: inherit;
   font-weight: 400;
