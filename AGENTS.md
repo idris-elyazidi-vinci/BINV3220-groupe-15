@@ -68,6 +68,20 @@ Les contrôles de droits sont **toujours côté serveur** (le frontend ne décid
    mettre à jour `backend/API.md` et les fichiers `backend/http/*.http`.
 5. **Expliquer** : chaque changement doit pouvoir être justifié (examen oral).
 
+Pour tout ajout de fonctionnalité ou correction de bug, lis et applique
+.github/skills/test-driven-development/SKILL.md avant de modifier le code
+de l’application. Écris et exécute les tests d’abord, présente-les, puis attends
+leur validation explicite avant l’implémentation. Cette règle ne concerne pas les
+demandes d’explication ou de documentation seules.
+
+## Skills et hooks (Copilot et Claude Code)
+
+- Les skills du projet vivent dans `.github/skills/<nom>/SKILL.md` (emplacement lu par
+  Copilot). Claude Code les lit via `.claude/skills/<nom>`, qui sont des liens symboliques
+  vers ces mêmes dossiers : une seule copie à maintenir.
+- Le hook Tool Guardian vit dans `.github/hooks/` (format Copilot). Claude Code l'utilise via
+  `.claude/settings.json` (`PreToolUse`) et l'adaptateur `.claude/hooks/guard-tool-claude.cjs`.
+
 ## Portée
 
 Développer uniquement la fonctionnalité demandée pour la séance. Pas de refactor opportuniste,
