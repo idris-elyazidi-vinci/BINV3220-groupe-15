@@ -147,6 +147,11 @@ récente à la plus ancienne, puis de la plus récente à la plus ancienne.
 - Header `Authorization` obligatoire
 - Paramètre `period` facultatif : `P1`, `P2` ou `OTHER`. Restreint la liste à cette période,
   en plus de la visibilité liée au profil (il ne révèle jamais une offre interdite au profil).
+- Paramètre `q` facultatif (100 caractères max) : texte cherché dans le titre, sans tenir
+  compte de la casse. Les espaces au début et à la fin sont ignorés ; une recherche vide
+  renvoie les offres normalement accessibles. Plusieurs mots sont cherchés comme une
+  expression entière (`q=tableau de bord`) ; `%` et `_` sont pris tels quels. Les accents
+  ne sont pas normalisés. Combinable avec `period` ; comme lui, il s'ajoute à la visibilité.
 
 ### Réponses
 
@@ -168,7 +173,8 @@ récente à la plus ancienne, puis de la plus récente à la plus ancienne.
 `period` vaut `P1`, `P2` ou `OTHER`. `status` vaut `SUBMITTED` (soumise), `PENDING`
 (en attente), `PUBLISHED` (publiée), `ASSIGNED` (attribuée) ou `ARCHIVED` (archivée).
 
-- `400` `INVALID_QUERY` : `period` a une valeur autre que `P1`, `P2` ou `OTHER`.
+- `400` `INVALID_QUERY` : `period` a une valeur autre que `P1`, `P2` ou `OTHER`, ou `q`
+  est répété ou dépasse 100 caractères.
 - `401` `UNAUTHENTICATED` : session absente ou invalide.
 - `403` `FORBIDDEN` : contact seulement promoteur ou signataire.
 
