@@ -93,14 +93,117 @@ construction) : lint OK, typecheck OK, backend **152 tests** (151 → 152), fron
   automatique est possible.
 - Session neuve : `test-driven-development` apparaît bien dans la liste des skills.
 
-**Fonctionnalité** : *à compléter dans la session dédiée (la recherche n'est pas codée ici)* —
-le test vu en échec puis en réussite, notre avis sur les tests proposés avant l'accord, la
-preuve que l'agent a lu le skill de lui-même.
+### Deux essais : pourquoi le premier ne compte pas comme preuve
+
+| | Essai 1 ([`conversation-2-essai-1-recherche.md`](semaine-4/conversation-2-essai-1-recherche.md)) | Essai 2 ([`conversation-3-recherche-tdd.md`](semaine-4/conversation-3-recherche-tdd.md)) |
+|---|---|---|
+| Démarrage | Lancé **en parallèle** de la session d'installation, donc **avant** que le skill du projet et la règle d'`AGENTS.md` existent | Session neuve, ouverte **après** l'installation, avec exactement le même message |
+| Skill lu | `superpowers:test-driven-development` (plugin global, **sans** consigne de pause) | `.github/skills/test-driven-development/SKILL.md` : **1re action de l'agent** (`cat .github/skills/test-driven-development/SKILL.md`), sans qu'on le lui demande |
+| Comportement | Tests d'abord, mais backend codé jusqu'au vert **sans attendre de validation**. En voyant arriver la règle en cours de route, l'agent a **annulé son code** et s'est arrêté sur les tests rouges | Tests écrits et exécutés, présentés, puis **arrêt** : « j'attends ta validation avant d'implémenter » |
+| Suite | Session fermée sans réponse ; ses tests sont archivés dans [`essai-1-tests-proposes.patch`](semaine-4/essai-1-tests-proposes.patch) | Validation donnée, puis implémentation |
+
+Ce que l'essai 1 montre quand même : un **guide qui apparaît en cours de session** est pris en
+compte (l'agent relit `CLAUDE.md`/`AGENTS.md`), et **deux skills portant le même nom**
+peuvent entrer en concurrence. Le chemin explicite dans `AGENTS.md` a levé l'ambiguïté dans
+l'essai 2.
+
+**Limite de l'essai 2, à signaler honnêtement** : sa 3e action a été de lire les traces de
+l'essai 1 (le `.patch` et la conversation), que nous avions rangées dans `docs/semaine-4/`.
+Ses tests ont donc pu s'en inspirer. Cela n'enlève rien au point vérifié (le skill du projet
+est lu en premier, de lui-même, et l'agent s'arrête avant le code), mais l'essai n'est pas
+« aveugle ». En début de session, l'agent a aussi été interrompu deux fois par erreur, puis
+relancé par « reprend ».
+
+### Test vu en échec avant l'implémentation, puis en réussite
+
+Tests présentés **avant tout code** (aucun fichier de `src/` modifié à ce stade) :
+
+- **Backend** (`backend/tests/offers.test.ts`, 14 cas) : **12 en échec**, 2 au vert. Exemple :
+  `?q=blockchain` attendu `[]`, observé « les 10 offres » (le paramètre `q` était ignoré).
+  Les 2 cas au vert sont `?q=` et `?q=%20%20%20` : ils ne demandent aucun changement et servent
+  de garde-fou contre une implémentation qui filtrerait par erreur sur une recherche vide.
+- **Frontend** (`frontend/tests/OffersPage.test.tsx`, 4 cas) : **4 en échec**,
+  `Unable to find a label with the text of: Rechercher par titre`.
+
+Après implémentation : backend **166 / 166**, frontend **59 / 59**.
+
+Contre-preuve, faite par l'agent après coup : en retirant temporairement le `trim` côté front,
+le test « que des espaces » (renforcé, voir ci-dessous) **repasse au rouge**. Le code a été
+restauré ensuite.
+
+### Notre avis sur les tests proposés, avant de donner l'accord
+
+- **Bonne couverture des règles d'EF-30** : chacune a son test (casse, espaces, vide,
+  aucun résultat, expression entière, ordre des mots, combinaison période, visibilité
+  étudiant **et** déposant). Le cas `%` (joker de `LIKE`) est un bon réflexe qu'on n'aurait pas
+  pensé à demander.
+- **L'agent a lui-même repéré un test trop faible** : `?q=des&period=OTHER` passait sans aucun
+  code, parce que la période seule donnait déjà le même résultat. Il l'a remplacé par
+  `?q=de&period=P2`, où chaque filtre retire réellement des offres.
+- **Ce que nous avons demandé de changer** : le délai de frappe. L'agent signalait que le test
+  « que des espaces » vérifiait le dernier appel **avant** la fin des 300 ms, donc qu'il
+  pouvait passer avec un bug. Accord donné à condition de **renforcer ce test** (attendre la fin
+  du délai, puis vérifier qu'aucun appel ne contient `q=`).
+- **Ce que nous n'avons pas vu** : une attente fausse. « Numérisation d'archives **papi**er »
+  contient « api », donc `?q=api` doit renvoyer 2 offres, pas 1. L'agent l'a découvert au
+  passage au vert et a corrigé **l'attente du test, pas le code**, en l'expliquant.
+  Leçon : relire les données du seed avant de valider des valeurs attendues.
 
 ## 3. Recherche : essais et résultats
 
-*À compléter après l'implémentation* : cas essayés au navigateur, résultat de
-`npm run check`, problèmes restants.
+### Ce qui a été implémenté
+
+- **Backend** : `GET /offers?q=…`, validé dans le controller sur le modèle de `?q=` des
+  entreprises (trim, vide → ignoré, 100 caractères maximum, `400 INVALID_QUERY` si répété ou
+  trop long). Le service ajoute la recherche **au** filtre de visibilité et à la période, il ne
+  les remplace pas. Le repository ajoute `o.title LIKE @pattern ESCAPE '\'`, en échappant `%`,
+  `_` et `\`.
+- **Frontend** : champ « Rechercher par titre » (composant `SearchField` déjà existant), délai
+  de 300 ms pendant la frappe, message « Aucune offre ne correspond à la recherche. » (sans
+  recherche, le message reste « Aucune offre à afficher. »).
+- **Documentation** : `backend/API.md` et `backend/http/offers.http` mis à jour.
+
+### `npm run check` (relancé à la racine après la session)
+
+| Contrôle | Résultat |
+|---|---|
+| lint (oxlint `--deny-warnings`) | 0 avertissement, 0 erreur |
+| typecheck | 0 erreur |
+| test | backend **166 / 166**, frontend **59 / 59** |
+| build | OK |
+| global | **exit 0** |
+
+### Cas essayés sur l'API réelle
+
+Serveur lancé sur la base de démo (port 3001, le port 3000 étant occupé par un autre projet
+sur la machine), requêtes `curl` avec trois profils :
+
+| Profil | Requête | Résultat observé | Conforme |
+|---|---|---|---|
+| admin | `?q=APPLICATION` | « Application React de gestion de flotte », « Migration d'une application vers le cloud » | ✅ casse ignorée |
+| étudiant | `?q=application` | seulement « Application React… » (l'autre offre n'est pas publiée) | ✅ visibilité |
+| étudiant | `?q=%20%20facturation%20%20` | « API REST de facturation » | ✅ espaces ignorés |
+| étudiant | `?q=` et `?q=%20%20%20` | ses 4 offres publiées habituelles | ✅ recherche vide |
+| étudiant | `?q=blockchain` | `[]` | ✅ aucun résultat |
+| admin | `?q=tableau%20de%20bord` / `?q=bord%20tableau` | 1 offre / `[]` | ✅ expression entière |
+| admin | `?q=de&period=P2` | 3 offres (intersection des deux filtres) | ✅ combinaison |
+| admin | `?q=%25` (`%`) | `[]` | ✅ pas de joker |
+| étudiant / contact déposant | `?q=portail` | `[]` / « Refonte du portail client » (son offre) | ✅ visibilité par profil |
+| admin | `?q=a&q=b` / 101 caractères | `400 INVALID_QUERY` | ✅ |
+| sans session | `?q=api` | `401 UNAUTHENTICATED` | ✅ |
+
+### Problèmes restants et limites
+
+- **Pas de test manuel au navigateur** : le proxy Vite vise le port 3000, occupé sur cette
+  machine par un autre projet. Le comportement de la page est couvert par les 4 tests front
+  (avec `fetch` simulé) et l'API par les essais ci-dessus, mais le parcours complet
+  page → API réelle n'a pas été rejoué.
+- **Accents** : `LIKE` de SQLite n'ignore la casse que pour les lettres ASCII (`é` ≠ `É`). C'est
+  conforme à l'énoncé (accents hors périmètre), à savoir pour l'oral.
+- **Code dupliqué** : `parseSearch` et `escapeLike` existent maintenant à l'identique pour les
+  entreprises et les offres. L'agent l'a signalé et proposé de les mettre en commun. Nous avons
+  refusé pour cette séance (`AGENTS.md` › Portée : « pas de refactor opportuniste »). C'est à
+  faire dans un commit séparé si le motif se répète une 3e fois.
 
 ## 4. Hook Tool Guardian
 
@@ -133,4 +236,18 @@ Sous-sessions lancées pendant cette partie (relevé `total_cost_usd` des sortie
 | Hook, essai `git status` | Haiku | 68 504 | 387 | 0,006 $ |
 | Hook, essai suppression | Haiku | 103 522 | 1 148 | 0,006 $ |
 
-*À compléter* : la session principale (relevé `/cost` ou `/usage`) et les crédits du binôme.
+Sessions principales (relevé dans les journaux de session de Claude Code, champ `usage` de
+chaque réponse ; abonnement Claude Pro, donc pas de crédits débités en euros) :
+
+| Session | Modèle | Réponses de l'agent | Tokens générés | Contexte nouveau | Relu depuis le cache |
+|---|---|---|---|---|---|
+| Installation, audit, hook (conversation 1) | Opus | 42 | ~33 k | ~123 k | ~4,6 M |
+| Recherche, essai 1 (conversation 2) | Opus | 24 | ~15 k | ~90 k | ~2,2 M |
+| Recherche, essai 2 (conversation 3) | Opus | 21 | ~19 k | ~72 k | ~1,7 M |
+
+Groupe 15 en solo : pas de binôme, donc pas d'autres crédits à déclarer.
+
+Constat lié à la fenêtre de contexte : le poste le plus lourd est de loin le **contexte relu**
+à chaque appel d'outil (des millions de tokens), pas le texte produit. Une session longue
+coûte de plus en plus cher à chaque étape. C'est une raison concrète de séparer le travail en
+sessions courtes, une par tâche, comme ici.
