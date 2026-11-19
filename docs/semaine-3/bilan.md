@@ -1,6 +1,5 @@
 # Bilan — Semaine 3 : harnais agentique (guides et senseurs)
 
-> Brouillon à relire et reformuler dans mes propres mots avant la remise.
 > Rapport complet : [`../semaine-3.md`](../semaine-3.md).
 
 ## Qu'ai-je appris ?
@@ -42,4 +41,4 @@
 
 | Membre | Outil | Consommation |
 |---|---|---|
-| Idris | Claude Code | *à compléter* |
+| Idris | Claude Code (Opus 5.5, abonnement) | Pas de compteur de crédits en € : consommation relevée dans le journal de session, de la 1re demande à la fin de la Phase 4 : **30 réponses de l'agent**, ~31 k tokens générés, ~119 k tokens de contexte nouveaux, ~3,2 M tokens relus depuis le cache (le contexte est relu à chaque appel d'outil). |
