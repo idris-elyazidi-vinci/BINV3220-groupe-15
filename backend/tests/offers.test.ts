@@ -138,3 +138,101 @@ describe("GET /offers : filtre par période", () => {
     expect(response.body.error.code).toBe("INVALID_QUERY");
   });
 });
+
+describe("GET /offers : recherche par mot-clé dans le titre (EF-30)", () => {
+  it("ne garde que les offres dont le titre contient le texte, sans tenir compte de la casse", async () => {
+    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, "?q=api");
+
+    // « API REST de facturation » (casse différente) et « Numérisation d'archives papier ».
+    expect(response.status).toBe(200);
+    expect(offerIds(response.body)).toEqual([OFFER.BILLING_API, OFFER.ARCHIVE_DIGITIZATION]);
+  });
+
+  it("ignore les espaces au début et à la fin de la recherche", async () => {
+    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, "?q=%20%20api%20");
+
+    expect(offerIds(response.body)).toEqual([OFFER.BILLING_API, OFFER.ARCHIVE_DIGITIZATION]);
+  });
+
+  it.each([
+    ["vide", "?q="],
+    ["faite uniquement d'espaces", "?q=%20%20%20"],
+  ])("renvoie toutes les offres accessibles pour une recherche %s", async (_cas, query) => {
+    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, query);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(10);
+  });
+
+  it("renvoie une liste vide quand aucun titre ne correspond", async () => {
+    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, "?q=blockchain");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([]);
+  });
+
+  it("cherche l'expression entière quand la recherche contient plusieurs mots", async () => {
+    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, "?q=tableau%20de%20bord");
+
+    expect(offerIds(response.body)).toEqual([OFFER.DATA_QUALITY]);
+  });
+
+  it("ne trouve rien quand les mots sont dans un autre ordre que dans le titre", async () => {
+    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, "?q=bord%20tableau");
+
+    expect(response.body).toEqual([]);
+  });
+
+  it("traite % comme un caractère ordinaire et non comme un joker", async () => {
+    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, "?q=%25");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([]);
+  });
+
+  it("combine la recherche avec le filtre de période", async () => {
+    const response = await listOffersAs(
+      "ADMIN",
+      ADMINISTRATOR.ANNE_LECLERCQ,
+      "?q=de&period=P2",
+    );
+
+    // « de » apparaît aussi dans deux offres OTHER et une offre P1, exclues par la période ;
+    // les autres offres P2 sont exclues par la recherche.
+    expect(offerIds(response.body)).toEqual([OFFER.DATA_QUALITY, OFFER.FLEET_APP, OFFER.BILLING_API]);
+  });
+
+  it("n'expose pas à un étudiant une offre non publiée dont le titre correspond", async () => {
+    const response = await listOffersAs("STUDENT", STUDENT.LUCAS_DUPONT, "?q=portail");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([]);
+  });
+
+  it("ne montre à un étudiant que les offres publiées qui correspondent", async () => {
+    const response = await listOffersAs("STUDENT", STUDENT.LUCAS_DUPONT, "?q=de");
+
+    // « de » apparaît aussi dans trois offres non publiées (SUBMITTED, PENDING, ARCHIVED).
+    expect(offerIds(response.body)).toEqual([OFFER.DATA_QUALITY, OFFER.FLEET_APP, OFFER.BILLING_API]);
+  });
+
+  it("n'expose pas à un déposant l'offre d'un collègue dont le titre correspond", async () => {
+    const response = await listOffersAs("CONTACT", CONTACT.CLAIRE_DUMONT, "?q=portail");
+
+    expect(response.body).toEqual([]);
+  });
+
+  it("rejette un paramètre q répété (400)", async () => {
+    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, "?q=api&q=pdf");
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("INVALID_QUERY");
+  });
+
+  it("rejette une recherche de plus de 100 caractères (400)", async () => {
+    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, `?q=${"a".repeat(101)}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("INVALID_QUERY");
+  });
+});

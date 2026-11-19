@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import OffersPage from "../src/pages/OffersPage.tsx";
 import { adminUser, contactUser, stubFetch, studentUser } from "./helpers/fetchMock.ts";
@@ -158,5 +158,75 @@ describe("OffersPage — candidater (EF-32)", () => {
     await screen.findByText("Application React de gestion de flotte");
 
     expect(screen.queryByRole("button", { name: "Candidater" })).not.toBeInTheDocument();
+  });
+});
+
+describe("OffersPage — recherche par titre (EF-30)", () => {
+  it("transmet le texte saisi à l'API, sans les espaces au début et à la fin", async () => {
+    const fetchMock = stubFetch({ "/api/offers": () => Response.json(offers) });
+
+    render(<OffersPage user={adminUser} token="jeton" onUnauthorized={vi.fn()} />);
+    await screen.findByText("Refonte du portail client");
+
+    fireEvent.change(screen.getByLabelText("Rechercher par titre"), {
+      target: { value: "  portail client " },
+    });
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        "/api/offers?q=portail+client",
+        expect.anything(),
+      ),
+    );
+  });
+
+  it("n'envoie pas de paramètre q pour une recherche faite uniquement d'espaces", async () => {
+    const fetchMock = stubFetch({ "/api/offers": () => Response.json(offers) });
+
+    render(<OffersPage user={adminUser} token="jeton" onUnauthorized={vi.fn()} />);
+    await screen.findByText("Refonte du portail client");
+
+    fireEvent.change(screen.getByLabelText("Rechercher par titre"), { target: { value: "   " } });
+    // On laisse passer le délai de frappe (300 ms) : un appel avec q fautif aurait eu lieu.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
+
+    const calledUrls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(calledUrls.length).toBeGreaterThan(0);
+    expect(calledUrls.every((url) => url === "/api/offers")).toBe(true);
+  });
+
+  it("combine la recherche avec la période choisie", async () => {
+    const fetchMock = stubFetch({ "/api/offers": () => Response.json(offers) });
+
+    render(<OffersPage user={adminUser} token="jeton" onUnauthorized={vi.fn()} />);
+    await screen.findByText("Refonte du portail client");
+
+    fireEvent.change(screen.getByLabelText("Filtrer par période"), { target: { value: "P2" } });
+    fireEvent.change(screen.getByLabelText("Rechercher par titre"), { target: { value: "api" } });
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        "/api/offers?period=P2&q=api",
+        expect.anything(),
+      ),
+    );
+  });
+
+  it("affiche un message adapté quand aucune offre ne correspond à la recherche", async () => {
+    stubFetch({
+      "/api/offers?q=": () => Response.json([]),
+      "/api/offers": () => Response.json(offers),
+    });
+
+    render(<OffersPage user={adminUser} token="jeton" onUnauthorized={vi.fn()} />);
+    await screen.findByText("Refonte du portail client");
+
+    fireEvent.change(screen.getByLabelText("Rechercher par titre"), {
+      target: { value: "blockchain" },
+    });
+
+    expect(
+      await screen.findByText("Aucune offre ne correspond à la recherche."),
+    ).toBeInTheDocument();
   });
 });

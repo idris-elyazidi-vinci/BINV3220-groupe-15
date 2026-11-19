@@ -18,11 +18,12 @@ const visibilityFilter = (viewer: User): OfferFilter => {
 
 export const createOffersService = (repository: OffersRepository) => ({
   /**
-   * Offres visibles par le profil, éventuellement restreintes à une période. Le filtre de
-   * période s'ajoute à la visibilité : il ne peut jamais révéler une offre interdite au profil.
+   * Offres visibles par le profil, éventuellement restreintes à une période et à un texte
+   * cherché dans le titre. Ces filtres s'ajoutent à la visibilité : ils ne peuvent jamais
+   * révéler une offre interdite au profil.
    */
-  listOffers: (viewer: User, period?: PeriodCode): Offer[] =>
-    repository.findAll({ ...visibilityFilter(viewer), period }).map(toOffer),
+  listOffers: (viewer: User, period?: PeriodCode, search?: string): Offer[] =>
+    repository.findAll({ ...visibilityFilter(viewer), period, search }).map(toOffer),
 });
 
 export type OffersService = ReturnType<typeof createOffersService>;

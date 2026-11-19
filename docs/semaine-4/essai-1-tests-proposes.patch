@@ -1,0 +1,192 @@
+diff --git a/backend/tests/offers.test.ts b/backend/tests/offers.test.ts
+index d6c7add..a6afc3a 100644
+--- a/backend/tests/offers.test.ts
++++ b/backend/tests/offers.test.ts
+@@ -138,3 +138,109 @@ describe("GET /offers : filtre par période", () => {
+     expect(response.body.error.code).toBe("INVALID_QUERY");
+   });
+ });
++
++describe("GET /offers : recherche par mot-clé dans le titre (EF-30)", () => {
++  const sorted = (ids: number[]): number[] => [...ids].sort((a, b) => a - b);
++
++  it("trouve les offres dont le titre contient le texte, sans tenir compte de la casse", async () => {
++    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, "?q=APPLICATION");
++
++    expect(response.status).toBe(200);
++    expect(sorted(offerIds(response.body))).toEqual([OFFER.FLEET_APP, OFFER.CLOUD_MIGRATION]);
++  });
++
++  it("conserve la visibilité : un étudiant ne trouve que les offres publiées", async () => {
++    const response = await listOffersAs("STUDENT", STUDENT.LUCAS_DUPONT, "?q=application");
++
++    expect(offerIds(response.body)).toEqual([OFFER.FLEET_APP]);
++  });
++
++  it("ignore les espaces au début et à la fin du texte cherché", async () => {
++    const response = await listOffersAs(
++      "STUDENT",
++      STUDENT.LUCAS_DUPONT,
++      `?q=${encodeURIComponent("  facturation  ")}`,
++    );
++
++    expect(offerIds(response.body)).toEqual([OFFER.BILLING_API]);
++  });
++
++  it.each([
++    ["vide", "?q="],
++    ["composée uniquement d'espaces", `?q=${encodeURIComponent("   ")}`],
++  ])("renvoie les offres normalement accessibles pour une recherche %s", async (_cas, query) => {
++    const response = await listOffersAs("STUDENT", STUDENT.LUCAS_DUPONT, query);
++
++    expect(offerIds(response.body)).toEqual([
++      OFFER.INTERNAL_CHATBOT,
++      OFFER.DATA_QUALITY,
++      OFFER.FLEET_APP,
++      OFFER.BILLING_API,
++    ]);
++  });
++
++  it("renvoie une liste vide quand aucun titre ne correspond", async () => {
++    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, "?q=blockchain");
++
++    expect(response.status).toBe(200);
++    expect(response.body).toEqual([]);
++  });
++
++  it("cherche uniquement dans le titre, pas dans la description", async () => {
++    // « missions » n'apparaît que dans la description de l'offre CONSULTANT_PLANNING.
++    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, "?q=missions");
++
++    expect(response.body).toEqual([]);
++  });
++
++  it("cherche une expression de plusieurs mots en entier", async () => {
++    const response = await listOffersAs(
++      "ADMIN",
++      ADMINISTRATOR.ANNE_LECLERCQ,
++      `?q=${encodeURIComponent("portail client")}`,
++    );
++
++    expect(offerIds(response.body)).toEqual([OFFER.CLIENT_PORTAL]);
++  });
++
++  it("ne trouve rien quand les mots sont présents mais pas dans cet ordre", async () => {
++    const response = await listOffersAs(
++      "ADMIN",
++      ADMINISTRATOR.ANNE_LECLERCQ,
++      `?q=${encodeURIComponent("client portail")}`,
++    );
++
++    expect(response.body).toEqual([]);
++  });
++
++  it("se combine avec le filtre par période", async () => {
++    // « de » seul : offres 1, 3, 4, 5, 8, 9 ; P2 seule : 1, 2, 3, 5, 6, 7, 10 → intersection : 1, 3, 5.
++    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, "?q=de&period=P2");
++
++    expect(sorted(offerIds(response.body))).toEqual([
++      OFFER.FLEET_APP,
++      OFFER.BILLING_API,
++      OFFER.DATA_QUALITY,
++    ]);
++  });
++
++  it("traite les caractères spéciaux de LIKE comme du texte", async () => {
++    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, "?q=%25");
++
++    expect(response.body).toEqual([]);
++  });
++
++  it("refuse une recherche trop longue (400)", async () => {
++    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, `?q=${"a".repeat(101)}`);
++
++    expect(response.status).toBe(400);
++    expect(response.body.error.code).toBe("INVALID_QUERY");
++  });
++
++  it("refuse un paramètre q répété (400)", async () => {
++    const response = await listOffersAs("ADMIN", ADMINISTRATOR.ANNE_LECLERCQ, "?q=a&q=b");
++
++    expect(response.status).toBe(400);
++    expect(response.body.error.code).toBe("INVALID_QUERY");
++  });
++});
+diff --git a/frontend/tests/OffersPage.test.tsx b/frontend/tests/OffersPage.test.tsx
+index 3fc9514..e81c145 100644
+--- a/frontend/tests/OffersPage.test.tsx
++++ b/frontend/tests/OffersPage.test.tsx
+@@ -160,3 +160,73 @@ describe("OffersPage — candidater (EF-32)", () => {
+     expect(screen.queryByRole("button", { name: "Candidater" })).not.toBeInTheDocument();
+   });
+ });
++
++describe("OffersPage — recherche par mot-clé dans le titre (EF-30)", () => {
++  it("transmet le texte saisi à l'API, sans les espaces de début et de fin", async () => {
++    const fetchMock = stubFetch({ "/api/offers": () => Response.json(offers) });
++
++    render(<OffersPage user={adminUser} token="jeton" onUnauthorized={vi.fn()} />);
++    await screen.findByText("Refonte du portail client");
++
++    fireEvent.change(screen.getByLabelText("Rechercher dans le titre"), {
++      target: { value: "  portail  " },
++    });
++
++    await waitFor(() =>
++      expect(fetchMock).toHaveBeenLastCalledWith("/api/offers?q=portail", expect.anything()),
++    );
++  });
++
++  it("combine la recherche avec la période choisie", async () => {
++    const fetchMock = stubFetch({ "/api/offers": () => Response.json(offers) });
++
++    render(<OffersPage user={adminUser} token="jeton" onUnauthorized={vi.fn()} />);
++    await screen.findByText("Refonte du portail client");
++
++    fireEvent.change(screen.getByLabelText("Filtrer par période"), { target: { value: "P2" } });
++    fireEvent.change(screen.getByLabelText("Rechercher dans le titre"), {
++      target: { value: "portail client" },
++    });
++
++    await waitFor(() =>
++      expect(fetchMock).toHaveBeenLastCalledWith(
++        "/api/offers?period=P2&q=portail+client",
++        expect.anything(),
++      ),
++    );
++  });
++
++  it("n'envoie pas de recherche quand le champ ne contient que des espaces", async () => {
++    const fetchMock = stubFetch({ "/api/offers": () => Response.json(offers) });
++
++    render(<OffersPage user={adminUser} token="jeton" onUnauthorized={vi.fn()} />);
++    await screen.findByText("Refonte du portail client");
++
++    fireEvent.change(screen.getByLabelText("Rechercher dans le titre"), {
++      target: { value: "   " },
++    });
++
++    await waitFor(() =>
++      expect(fetchMock).toHaveBeenLastCalledWith("/api/offers", expect.anything()),
++    );
++  });
++
++  it("affiche un message adapté quand la recherche ne trouve aucune offre", async () => {
++    // Le préfixe le plus long l'emporte : une recherche renvoie [], le chargement initial les offres.
++    stubFetch({
++      "/api/offers?q=": () => Response.json([]),
++      "/api/offers": () => Response.json(offers),
++    });
++
++    render(<OffersPage user={adminUser} token="jeton" onUnauthorized={vi.fn()} />);
++    await screen.findByText("Refonte du portail client");
++
++    fireEvent.change(screen.getByLabelText("Rechercher dans le titre"), {
++      target: { value: "blockchain" },
++    });
++
++    expect(
++      await screen.findByText("Aucune offre ne correspond à la recherche."),
++    ).toBeInTheDocument();
++  });
++});
