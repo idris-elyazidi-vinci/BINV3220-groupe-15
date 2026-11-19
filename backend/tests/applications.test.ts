@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { ADMINISTRATOR, APPLICATION, CONTACT, OFFER, STUDENT } from "../src/db/seed/seedIds.ts";
 import type { UserKind } from "../src/models/user.ts";
 import { createTestApp, tokenFor } from "./helpers/testApp.ts";
+import { createTestDatabase } from "./helpers/testDatabase.ts";
 
 let app: ReturnType<typeof createTestApp>;
 
@@ -320,5 +321,35 @@ describe("EF-33 : chaque statut de candidature est exposé", () => {
       companyShortName: expect.any(String),
     });
     expect(response.body[0].offerTitle).not.toBe("");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Complément semaine 4 — manque confirmé par l'audit test-gap-audit (docs/semaine-4.md).
+// ---------------------------------------------------------------------------
+
+describe("EF-32 : re-candidater après un refus (décision de groupe)", () => {
+  it("autorise une nouvelle candidature après un refus et conserve l'ancienne « Non retenue »", async () => {
+    // Aucune candidature REJECTED du seed ne porte sur une offre publiée, et la sélection
+    // par l'administrateur (EF-34) n'existe pas encore : on prépare le refus en SQL,
+    // sur une base de test isolée.
+    const db = createTestDatabase();
+    db.prepare("UPDATE applications SET status = 'REJECTED' WHERE id = @id").run({
+      id: APPLICATION.LUCAS_FLEET_APP,
+    });
+    app = createTestApp(db);
+    const token = asStudent(STUDENT.LUCAS_DUPONT);
+
+    const response = await applyAs(token, { offerId: OFFER.FLEET_APP });
+
+    expect(response.status).toBe(201);
+    expect(response.body.status).toBe("IN_PROGRESS");
+    expect(response.body.id).not.toBe(APPLICATION.LUCAS_FLEET_APP);
+    const list = await listAs(token);
+    expect(statusOf(list.body, APPLICATION.LUCAS_FLEET_APP)).toBe("REJECTED");
+    expect(statusOf(list.body, response.body.id)).toBe("IN_PROGRESS");
+    const again = await applyAs(token, { offerId: OFFER.FLEET_APP });
+    expect(again.status).toBe(409);
+    expect(again.body.error.code).toBe("ALREADY_APPLIED");
   });
 });
